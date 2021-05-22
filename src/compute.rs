@@ -1,19 +1,22 @@
-use std::sync::mpsc;
+use std::{
+    cmp::Ordering,
+    sync::{mpsc, Arc},
+};
 
 use crate::io::Node;
 
-pub struct ReportByException<'a> {
+pub struct ReportByException {
     last_value: Vec<u8>,
-    chan: (mpsc::Sender<&'a [u8]>, mpsc::Receiver<&'a [u8]>),
-    outs: Vec<mpsc::Sender<&'a [u8]>>,
+    chan: (mpsc::Sender<Arc<Vec<u8>>>, mpsc::Receiver<Arc<Vec<u8>>>),
+    outs: Vec<mpsc::Sender<Arc<Vec<u8>>>>,
 }
 
-impl<'a> Node<'a> for ReportByException<'a> {
-    fn get_sender(&self) -> mpsc::Sender<&'a [u8]> {
+impl Node for ReportByException {
+    fn get_sender(&self) -> mpsc::Sender<Arc<Vec<u8>>> {
         self.chan.0.clone()
     }
 
-    fn add_output(&mut self, sender: mpsc::Sender<&'a [u8]>) {
+    fn add_output(&mut self, sender: mpsc::Sender<Arc<Vec<u8>>>) {
         self.outs.push(sender)
     }
 
@@ -21,10 +24,10 @@ impl<'a> Node<'a> for ReportByException<'a> {
         loop {
             match self.chan.1.recv() {
                 Ok(data) => {
-                    if self.last_value != data {
+                    if data.iter().cmp(&self.last_value) != Ordering::Equal {
                         self.last_value = data.to_vec();
                         for o in &self.outs {
-                            if o.send(data).is_err() {}
+                            if o.send(data.clone()).is_err() {}
                         }
                     }
                 }
@@ -34,7 +37,7 @@ impl<'a> Node<'a> for ReportByException<'a> {
     }
 }
 
-impl<'a> ReportByException<'a> {
+impl ReportByException {
     pub fn new() -> Self {
         Self {
             chan: mpsc::channel(),
@@ -44,18 +47,18 @@ impl<'a> ReportByException<'a> {
     }
 }
 
-pub struct StaticOutput<'a> {
+pub struct StaticOutput {
     output: &'static str,
-    chan: (mpsc::Sender<&'a [u8]>, mpsc::Receiver<&'a [u8]>),
-    output_nodes: Vec<mpsc::Sender<&'a [u8]>>,
+    chan: (mpsc::Sender<Arc<Vec<u8>>>, mpsc::Receiver<Arc<Vec<u8>>>),
+    output_nodes: Vec<mpsc::Sender<Arc<Vec<u8>>>>,
 }
 
-impl<'a> Node<'a> for StaticOutput<'a> {
-    fn get_sender(&self) -> mpsc::Sender<&'a [u8]> {
+impl Node for StaticOutput {
+    fn get_sender(&self) -> mpsc::Sender<Arc<Vec<u8>>> {
         self.chan.0.clone()
     }
 
-    fn add_output(&mut self, sender: mpsc::Sender<&'a [u8]>) {
+    fn add_output(&mut self, sender: mpsc::Sender<Arc<Vec<u8>>>) {
         self.output_nodes.push(sender)
     }
 
@@ -64,7 +67,7 @@ impl<'a> Node<'a> for StaticOutput<'a> {
             match self.chan.1.recv() {
                 Ok(_) => {
                     for o in &self.output_nodes {
-                        if o.send(self.output.as_bytes()).is_err() {}
+                        if o.send(Arc::new(self.output.as_bytes().to_vec())).is_err() {}
                     }
                 }
                 _ => (),
@@ -73,7 +76,7 @@ impl<'a> Node<'a> for StaticOutput<'a> {
     }
 }
 
-impl<'a> StaticOutput<'a> {
+impl StaticOutput {
     pub fn new(output: &'static str) -> Self {
         Self {
             chan: mpsc::channel(),
