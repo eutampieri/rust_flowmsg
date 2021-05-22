@@ -26,7 +26,7 @@ impl<'a> Node<'a> for ConsoleOut<'a> {
         self.chan.0.clone()
     }
 
-    fn add_output(&mut self, sender: mpsc::Sender<&[u8]>) {
+    fn add_output(&mut self, _: mpsc::Sender<&[u8]>) {
         panic!("Trying to add outputs to an input-only node");
     }
 
