@@ -13,11 +13,11 @@ pub trait Node {
 }
 
 pub struct ConsoleOut {
-    label: &'static str,
+    label: String,
     chan: (mpsc::Sender<SharedBuffer>, mpsc::Receiver<SharedBuffer>),
 }
 impl ConsoleOut {
-    pub fn new(label: &'static str) -> Self {
+    pub fn new(label: String) -> Self {
         Self {
             label,
             chan: mpsc::channel(),
@@ -86,11 +86,11 @@ impl Node for MqttIn {
 pub struct MqttOut {
     client: Client,
     chan: (mpsc::Sender<SharedBuffer>, mpsc::Receiver<SharedBuffer>),
-    topic: &'static str,
+    topic: String,
 }
 
 impl MqttOut {
-    pub fn new(server: &str, port: u16, topic: &'static str) -> Self {
+    pub fn new(server: &str, port: u16, topic: String) -> Self {
         let mut mqttoptions =
             MqttOptions::new(&format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
         mqttoptions.set_keep_alive(5);
@@ -119,7 +119,7 @@ impl Node for MqttOut {
             if let Ok(val) = self.chan.1.try_recv() {
                 if self
                     .client
-                    .publish(self.topic, QoS::ExactlyOnce, false, val.to_vec())
+                    .publish(&self.topic, QoS::ExactlyOnce, false, val.to_vec())
                     .is_err()
                 {}
             }

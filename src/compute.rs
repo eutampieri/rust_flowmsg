@@ -45,7 +45,7 @@ impl ReportByException {
 }
 
 pub struct StaticOutput {
-    output: &'static str,
+    output: String,
     chan: (mpsc::Sender<SharedBuffer>, mpsc::Receiver<SharedBuffer>),
     output_nodes: Vec<mpsc::Sender<SharedBuffer>>,
 }
@@ -71,7 +71,7 @@ impl Node for StaticOutput {
 }
 
 impl StaticOutput {
-    pub fn new(output: &'static str) -> Self {
+    pub fn new(output: String) -> Self {
         Self {
             chan: mpsc::channel(),
             output_nodes: vec![],
