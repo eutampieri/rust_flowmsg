@@ -95,7 +95,8 @@ impl MqttOut {
             MqttOptions::new(&format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
         mqttoptions.set_keep_alive(5);
 
-        let (client, _) = Client::new(mqttoptions, 10);
+        let (client, mut connection) = Client::new(mqttoptions, 10);
+        std::thread::spawn(move || for _ in connection.iter() {});
         Self {
             client,
             chan: mpsc::channel(),
@@ -113,9 +114,9 @@ impl Node for MqttOut {
         panic!("Attempting to subscribe to a recieve-only node")
     }
 
-    fn run(&mut self) {
+    fn run<'a>(&'a mut self) {
         loop {
-            if let Ok(val) = self.chan.1.recv() {
+            if let Ok(val) = self.chan.1.try_recv() {
                 if self
                     .client
                     .publish(self.topic, QoS::ExactlyOnce, false, val.to_vec())
