@@ -1,5 +1,5 @@
 [package]
-name = "luci"
+name = "rust_flowmsg"
 version = "0.1.0"
 authors = ["Eugenio Tampieri <eugenio@eutampieri.eu>"]
 edition = "2018"
