@@ -17,16 +17,12 @@ fn main() {
         match input[0].as_str() {
             "mqtt_in" => {
                 let id = input[1].clone();
-                let node = MqttIn::new(&input[2], dbg!(&input[3]).parse().unwrap(), &input[4]);
+                let node = MqttIn::new(&input[2], input[3].parse().unwrap(), &input[4]);
                 nodes.insert(id, Box::new(node));
             }
             "mqtt_out" => {
                 let id = input[1].clone();
-                let node = MqttOut::new(
-                    &input[2],
-                    dbg!(&input[3]).parse().unwrap(),
-                    input[4].clone(),
-                );
+                let node = MqttOut::new(&input[2], input[3].parse().unwrap(), input[4].clone());
                 nodes.insert(id, Box::new(node));
             }
             "rbe" => {
