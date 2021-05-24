@@ -116,7 +116,7 @@ impl Node for MqttOut {
 
     fn run<'a>(&'a mut self) {
         loop {
-            if let Ok(val) = self.chan.1.try_recv() {
+            if let Ok(val) = self.chan.1.recv() {
                 if self
                     .client
                     .publish(&self.topic, QoS::ExactlyOnce, false, val.to_vec())
