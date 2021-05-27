@@ -1,5 +1,9 @@
-use rumqttc::{Client, Connection, MqttOptions, QoS};
-use std::sync::{mpsc, Arc};
+use std::{
+    sync::{mpsc, Arc},
+    time::Duration,
+};
+
+use paho_mqtt::{Client, ConnectOptionsBuilder, CreateOptions, CreateOptionsBuilder};
 
 pub type SharedBuffer = Arc<Vec<u8>>;
 
@@ -43,20 +47,29 @@ impl Node for ConsoleOut {
 }
 
 pub struct MqttIn {
-    connection: Connection,
+    client: Client,
     outputs: Vec<mpsc::Sender<SharedBuffer>>,
 }
 
 impl MqttIn {
     pub fn new(server: &str, port: u16, topic: &str) -> Self {
-        let mut mqttoptions =
-            MqttOptions::new(&format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
-        mqttoptions.set_keep_alive(5);
+        let mqttoptions = CreateOptionsBuilder::new()
+            .server_uri(&format!("tcp://{}:{}", server, port))
+            .client_id(&format!("rust_flowmsg_{}", lolid::Uuid::v4()))
+            .finalize();
+        //mqttoptions. &format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
+        //mqttoptions.set_keep_alive(5);
+        let connection_options = ConnectOptionsBuilder::new()
+            .automatic_reconnect(Duration::from_secs(1), Duration::from_secs(10))
+            .keep_alive_interval(Duration::from_secs(20))
+            .clean_session(true)
+            .finalize();
 
-        let (mut client, connection) = Client::new(mqttoptions, 10);
-        client.subscribe(topic, QoS::ExactlyOnce).unwrap();
+        let client = Client::new(mqttoptions).expect("Failed to create MQTT client");
+        client.connect(connection_options);
+        client.subscribe(topic, 2).expect("Could not subscribe");
         Self {
-            connection,
+            client,
             outputs: vec![],
         }
     }
@@ -72,9 +85,10 @@ impl Node for MqttIn {
     }
 
     fn run(&mut self) {
-        for notification in self.connection.iter().flatten() {
-            if let rumqttc::Event::Incoming(rumqttc::Packet::Publish(msg)) = notification {
-                let payload = std::sync::Arc::new(msg.payload.to_vec());
+        let queue = self.client.start_consuming();
+        loop {
+            if let Ok(Some(msg)) = queue.recv() {
+                let payload = std::sync::Arc::new(msg.payload().to_vec());
                 for output in &self.outputs {
                     if output.send(payload.clone()).is_err() {}
                 }
@@ -91,12 +105,22 @@ pub struct MqttOut {
 
 impl MqttOut {
     pub fn new(server: &str, port: u16, topic: String) -> Self {
-        let mut mqttoptions =
-            MqttOptions::new(&format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
-        mqttoptions.set_keep_alive(5);
+        let mqttoptions = CreateOptionsBuilder::new()
+            .server_uri(&format!("tcp://{}:{}", server, port))
+            .client_id(&format!("rust_flowmsg_{}", lolid::Uuid::v4()))
+            .finalize();
+        //mqttoptions. &format!("rust_flowmsg_{}", lolid::Uuid::v4()), server, port);
+        //mqttoptions.set_keep_alive(5);
+        let connection_options = ConnectOptionsBuilder::new()
+            .automatic_reconnect(Duration::from_secs(1), Duration::from_secs(10))
+            .keep_alive_interval(Duration::from_secs(20))
+            .clean_session(true)
+            .finalize();
 
-        let (client, mut connection) = Client::new(mqttoptions, 10);
-        std::thread::spawn(move || for _ in connection.iter() {});
+        let client = Client::new(mqttoptions).expect("Failed to create MQTT client");
+        client
+            .connect(connection_options)
+            .expect("Failed to connect to topic");
         Self {
             client,
             chan: mpsc::channel(),
@@ -117,11 +141,9 @@ impl Node for MqttOut {
     fn run<'a>(&'a mut self) {
         loop {
             if let Ok(val) = self.chan.1.recv() {
-                if self
-                    .client
-                    .publish(&self.topic, QoS::ExactlyOnce, false, val.to_vec())
-                    .is_err()
-                {}
+                let msg = paho_mqtt::Message::new(&self.topic, val.to_vec(), 2);
+                let tok = self.client.publish(msg);
+                if tok.is_err() {}
             }
         }
     }
