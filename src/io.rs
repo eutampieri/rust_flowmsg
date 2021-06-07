@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use paho_mqtt::{Client, ConnectOptionsBuilder, CreateOptions, CreateOptionsBuilder};
+use paho_mqtt::{Client, ConnectOptionsBuilder, CreateOptionsBuilder};
 
 pub type SharedBuffer = Arc<Vec<u8>>;
 

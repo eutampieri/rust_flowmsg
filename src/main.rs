@@ -27,7 +27,7 @@ fn main() {
             }
             "rbe" => {
                 let id = input[1].clone();
-                nodes.insert(id, Box::new(ReportByException::new()));
+                nodes.insert(id.clone(), Box::new(ReportByException::new(&id)));
             }
             "static_out" => {
                 let id = input[1].clone();

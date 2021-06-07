@@ -9,6 +9,7 @@ pub struct ReportByException {
     last_value: Vec<u8>,
     chan: (mpsc::Sender<SharedBuffer>, mpsc::Receiver<SharedBuffer>),
     outs: Vec<mpsc::Sender<SharedBuffer>>,
+    id: String,
 }
 
 impl Node for ReportByException {
@@ -25,6 +26,7 @@ impl Node for ReportByException {
             if let Ok(data) = self.chan.1.recv() {
                 if data.iter().cmp(&self.last_value) != Ordering::Equal {
                     self.last_value = data.to_vec();
+                    std::fs::write(&self.id, &self.last_value).unwrap_or_default();
                     for o in &self.outs {
                         if o.send(data.clone()).is_err() {}
                     }
@@ -35,10 +37,12 @@ impl Node for ReportByException {
 }
 
 impl ReportByException {
-    pub fn new() -> Self {
+    pub fn new(id: &str) -> Self {
+        let last_value = std::fs::read(id).unwrap_or_default();
         Self {
+            id: id.to_owned(),
             chan: mpsc::channel(),
-            last_value: vec![],
+            last_value,
             outs: vec![],
         }
     }
